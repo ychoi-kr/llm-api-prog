@@ -18,7 +18,7 @@ upstage_client = OpenAI(
 def get_video_info(url):
     yt = YouTube(url)
     title = yt.title
-    # pytube에서 description을 가져오지 못하는 경우, fallback으로 description을 가져옴    
+    # pytube에서 description을 가져오지 못하는 경우, fallback으로 description을 가져옴
     description = yt.description if yt.description else get_description_fallback(url)
     print(f"\nTitle: {title}\nDescription: {description}")
     return title, description
@@ -112,7 +112,11 @@ if st.button("Load Video Info"):
         st.error("Please enter a valid YouTube URL.")
 
 # 영상 정보를 프롬프트에 표시
-prompt = st.text_area("What's the video about? (Optional)", value=st.session_state.get('video_info', ''), help="Provide a brief description of the video or include specific terms like unique names and key topics to enhance accuracy. This can include spelling out hard-to-distinguish proper nouns.")
+prompt = st.text_area(
+    "What's the video about? (Optional)",
+    value=st.session_state.get('video_info', ''),
+    help="Provide a brief description of the video or include specific terms like unique names and key topics to enhance accuracy. This can include spelling out hard-to-distinguish proper nouns."
+)
 response_format = st.selectbox("Select Output Format:", ('text', 'srt', 'vtt'))
 
 # 세션 상태 초기화
