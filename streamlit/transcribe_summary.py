@@ -4,14 +4,20 @@ from openai import BadRequestError, OpenAI
 import os
 import tempfile
 
-# API 키 설정
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+# 클라이언트 초기화
+openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+upstage_client = OpenAI(
+    api_key=os.environ["UPSTAGE_API_KEY"],
+    base_url="https://api.upstage.ai/v1/solar"
+)
 
 def get_video_info(url):
     yt = YouTube(url)
     title = yt.title
     # pytube에서 description을 가져오지 못하는 경우, fallback으로 description을 가져옴    
     description = yt.description if yt.description else get_description_fallback(url)
+    print(f"\nTitle: {title}\nDescription: {description}")
     return title, description
 
 # https://github.com/pytube/pytube/issues/1626#issuecomment-1775501965
@@ -26,15 +32,18 @@ def get_description_fallback(url):
     return False
 
 def download_audio(url):
+    print("Downloading audio...")
     video = YouTube(url).streams.filter(only_audio=True).first().download()
     return video
 
 def trim_file_to_size(filepath, max_size):
     file_size = os.path.getsize(filepath)
+    print(f"File size: {file_size} bytes")
 
     if file_size <= max_size:
         return filepath
 
+    print(f"File size exceeds the maximum size of {max_size} bytes. Trimming the file...")
     # 원본 파일의 확장자를 유지하기 위해 파일명에서 확장자 추출
     _, file_ext = os.path.splitext(filepath)
 
@@ -58,8 +67,9 @@ def transcribe(audio_filepath, response_format='text', prompt=None):
     trimmed_audio_filepath = trim_file_to_size(audio_filepath, MAX_FILE_SIZE)
 
     # 받아쓰기
+    print("Transcribing audio...")
     with open(trimmed_audio_filepath, "rb") as file:
-        transcript = client.audio.transcriptions.create(
+        transcript = openai_client.audio.transcriptions.create(
             file=file,
             model="whisper-1",
             response_format=response_format,
@@ -72,7 +82,8 @@ def transcribe(audio_filepath, response_format='text', prompt=None):
     if trimmed_audio_filepath != audio_filepath:
         os.remove(trimmed_audio_filepath)
 
-def summarize(transcript, model="gpt-3.5-turbo"):
+def summarize(transcript, client=upstage_client, model="solar-1-mini-chat"):
+    print(f"Summarizing transcript using model: {model}")
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -81,6 +92,7 @@ def summarize(transcript, model="gpt-3.5-turbo"):
             {"role": "user", "content": transcript},
         ],
     )
+    print("Summary generated.")
     return response.choices[0].message.content
 
 # Streamlit UI 구성
@@ -113,6 +125,7 @@ if st.button("Generate Subtitles"):
             transcribe(filename, response_format=response_format, prompt=prompt)
             os.remove(filename)  # 다운로드한 파일 삭제
         st.success('Done! Subtitles have been generated.')
+        print("Transcription completed.")
     else:
         st.error("Please enter a URL.")
 
@@ -124,12 +137,13 @@ if st.session_state.transcript:
 if st.button("Summarize"):
     if st.session_state.transcript:
         try:
-            # 요약 시도
+            # 요약문 생성
             st.session_state.summary = summarize(st.session_state.transcript)
         except BadRequestError as e:
             # BadRequestError 발생 시 다른 모델로 재시도
+            print("BadRequestError occurred: ", e)
             st.session_state.summary = \
-                summarize(st.session_state.transcript, model="gpt-4-turbo-preview")
+                summarize(st.session_state.transcript, client=openai_client, model="gpt-4-turbo")
 
 # 요약문이 있을 경우, 요약문 필드를 표시
 if st.session_state.summary:
