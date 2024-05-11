@@ -1,3 +1,4 @@
+from pydoc import cli
 import streamlit as st
 from pytube import YouTube
 from openai import BadRequestError, OpenAI
@@ -6,9 +7,11 @@ import tempfile
 
 
 # 클라이언트 초기화
-openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+openai_client = OpenAI(
+    api_key=st.secrets["OPENAI_API_KEY"]
+)
 upstage_client = OpenAI(
-    api_key=os.environ["UPSTAGE_API_KEY"],
+    api_key=st.secrets["UPSTAGE_API_KEY"],
     base_url="https://api.upstage.ai/v1/solar"
 )
 
@@ -82,7 +85,7 @@ def transcribe(audio_filepath, response_format='text', prompt=None):
     if trimmed_audio_filepath != audio_filepath:
         os.remove(trimmed_audio_filepath)
 
-def summarize(transcript, client=upstage_client, model="solar-1-mini-chat"):
+def summarize(transcript, client, model):
     print(f"Summarizing transcript using model: {model}")
     response = client.chat.completions.create(
         model=model,
@@ -138,12 +141,15 @@ if st.button("Summarize"):
     if st.session_state.transcript:
         try:
             # 요약문 생성
-            st.session_state.summary = summarize(st.session_state.transcript)
+            st.session_state.summary = summarize(
+                st.session_state.transcript, client=upstage_client, model="solar-1-mini-chat"
+            )
         except BadRequestError as e:
             # BadRequestError 발생 시 다른 모델로 재시도
             print("BadRequestError occurred: ", e)
-            st.session_state.summary = \
-                summarize(st.session_state.transcript, client=openai_client, model="gpt-4-turbo")
+            st.session_state.summary = summarize(
+                st.session_state.transcript, client=openai_client, model="gpt-4-turbo"
+            )
 
 # 요약문이 있을 경우, 요약문 필드를 표시
 if st.session_state.summary:
