@@ -25,7 +25,7 @@ def get_description_fallback(url):
             continue
     return False
 
-def download_video(url):
+def download_audio(url):
     video = YouTube(url).streams.filter(only_audio=True).first().download()
     return video
 
@@ -109,9 +109,9 @@ if 'summary' not in st.session_state:
 if st.button("Generate Subtitles"):
     if url:
         with st.spinner('Downloading and transcribing video... This may take a while.'):
-            video_path = download_video(url)
-            transcribe(video_path, response_format=response_format, prompt=prompt)
-            os.remove(video_path)  # 다운로드한 파일 삭제
+            filename = download_audio(url)
+            transcribe(filename, response_format=response_format, prompt=prompt)
+            os.remove(filename)  # 다운로드한 파일 삭제
         st.success('Done! Subtitles have been generated.')
     else:
         st.error("Please enter a URL.")
