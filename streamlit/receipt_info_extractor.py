@@ -40,16 +40,60 @@ if uploaded_image is not None:
         if 'fields' in receipt_data:
             st.success("영수증 정보 추출 완료!")
             
+            expense_details = []
+            date = None
+            total_amount = None
+            payment_method = None
+            card_number = None
+            
             for field in receipt_data['fields']:
-                if field['key'] == 'store.store_name':
-                    st.write(f"상호명: {field['value']}")
-                elif field['key'] == 'total.subtotal_price':
-                    st.write(f"소계: {field['value']}")
-                elif field['key'] == 'total.tip_price':
-                    st.write(f"팁: {field['value']}")  
-                elif field['key'] == 'total.tax_price':
-                    st.write(f"세금: {field['value']}")
-                elif field['key'] == 'total.charged_price':
-                    st.write(f"총계: {field['value']}")
+                print(field)
+                if field['key'].startswith('group'):
+                    product_name = None
+                    product_price = None
+                    for prop in field['properties']:
+                        if prop['key'].endswith('product_name'):
+                            product_name = prop['value']
+                        elif prop['key'].endswith('unit_product_total_price_before_discount'):
+                            product_price = prop['value']
+                    if product_name and product_price:
+                        expense_details.append(f"{product_name}: {product_price}")
+                elif field['key'] == 'date.date':
+                    date = field['value']
+                elif field['key'] == 'transaction.transaction_date' and field['type'] == 'content':
+                    date = field['value']
+                elif field['key'] == 'total.charged_price' and field['type'] == 'content':
+                    total_amount = field['value']
+                elif field['key'] == 'transaction.cc_code' and field['type'] == 'content':
+                    payment_method = field['value']
+                elif field['key'] == 'total.card_payment_price' and field['type'] == 'header':
+                    if '쿠페이' in field['value']:
+                        payment_method = '쿠페이'
+                elif field['key'] == 'payment.credit_card_number':
+                    card_number = field['value']
+            
+            st.write("지출 상세 내역:")
+            for detail in expense_details:
+                st.write(f"- {detail}")
+            
+            if date:
+                st.write(f"거래일시: {date}")
+            else:
+                st.write("거래일시를 찾을 수 없습니다.")
+            
+            if total_amount:
+                st.write(f"합계 금액: {total_amount}")
+            else:
+                st.write("합계 금액을 찾을 수 없습니다.")
+
+            if payment_method:
+                st.write(f"지불 수단: {payment_method}")
+            else:
+                st.write("지불 수단을 찾을 수 없습니다.")
+            
+            if card_number:
+                st.write(f"카드 번호: {card_number}")
+            else:
+                st.write("카드 번호를 찾을 수 없습니다.")
         else:
-            st.error("영수증 정보를 추출할 수 없습니다. 다른 영수증 이미지를 시도해주세요.")
+            st.error("영수증 정보를 추출할 수 없습니다. 다른 영수증 이미지를 시도해 주세요.")
