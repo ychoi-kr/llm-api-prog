@@ -12,30 +12,22 @@ st.set_page_config(layout="wide")
 st.title("Upstage Document OCR and Summarization")
 
 # API 키 설정
-document_ocr_api_key = st.secrets["UPSTAGE_API_KEY"]
-summarization_api_key = st.secrets["SOLAR_API_KEY"]
-
-# Upstage 클라이언트 초기화
-client = OpenAI(
-    api_key=summarization_api_key,
-    base_url="https://api.upstage.ai/v1/solar"
-)
+api_key = st.secrets["UPSTAGE_API_KEY"]
 
 def summarize_text(text):
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.upstage.ai/v1/solar"
+    )
     try:
         response = client.chat.completions.create(
-            model="solar-1-mini-summarization",
+            model="solar-1-mini-chat",
             messages=[
-                {
-                    "role": "user",
-                    "content": text
-                }
+                {"role": "system", "content": "Summarize text with bullets."},
+                {"role": "user", "content": text}
             ],
-            extra_body={
-                "format": "bullets",
-                "length": "auto"
-            }
         )
+        print("Summary generated.")
         summarized_text = response.choices[0].message.content
         return summarized_text
     except Exception as e:
@@ -74,7 +66,7 @@ if uploaded_file is not None and 'ocr_clicked' in st.session_state and \
 
     # 업스테이지 API OCR 요청
     url = "https://api.upstage.ai/v1/document-ai/ocr"
-    headers = {"Authorization": f"Bearer {document_ocr_api_key}"}
+    headers = {"Authorization": f"Bearer {api_key}"}
 
     # 이미지 파일을 바이트로 읽기
     image_bytes = uploaded_file.getvalue()
