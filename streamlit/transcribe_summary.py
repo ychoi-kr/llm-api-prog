@@ -146,13 +146,17 @@ if st.button("Summarize"):
         try:
             # 요약문 생성
             st.session_state.summary = summarize(
-                st.session_state.transcript, client=upstage_client, model="solar-1-mini-chat"
+                st.session_state.transcript,
+                client=upstage_client,
+                model="solar-1-mini-chat"
             )
         except BadRequestError as e:
             # BadRequestError 발생 시 다른 모델로 재시도
             print("BadRequestError occurred: ", e)
             st.session_state.summary = summarize(
-                st.session_state.transcript, client=openai_client, model="gpt-4-turbo"
+                st.session_state.transcript,
+                client=openai_client,
+                model="gpt-4-turbo"
             )
 
 # 요약문이 있을 경우, 요약문 필드를 표시
