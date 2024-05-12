@@ -91,32 +91,18 @@ if uploaded_image is not None:
                 elif field['key'] == 'payment.credit_card_number':
                     card_number = field['value']
             
-            st.write("지출 상세 내역:")
-            for detail in expense_details:
-                st.write(f"- {detail}")
-            
-            if date:
-                st.write(f"거래일시: {date}")
-            else:
-                st.write("거래일시를 찾을 수 없습니다.")
-            
-            if total_amount:
-                st.write(f"합계 금액: {total_amount}")
-            else:
-                st.write("합계 금액을 찾을 수 없습니다.")
-
-            if payment_method:
-                st.write(f"지불 수단: {payment_method}")
-            else:
-                st.write("지불 수단을 찾을 수 없습니다.")
-            
-            if card_number:
-                st.write(f"카드 번호: {card_number}")
-            else:
-                st.write("카드 번호를 찾을 수 없습니다.")
-            
             expense_category = classify_expense(expense_details)
-            st.write(f"지출 분류: {expense_category}")
+            
+            output = f"지출 상세 내역:\n"
+            for detail in expense_details:
+                output += f"- {detail}\n"
+            
+            output += f"\n거래일시: {date if date else '찾을 수 없음'}"
+            output += f"\n합계 금액: {total_amount if total_amount else '찾을 수 없음'}"
+            output += f"\n지불 수단: {payment_method if payment_method else '찾을 수 없음'}"
+            output += f"\n카드 번호: {card_number if card_number else '찾을 수 없음'}"
+            output += f"\n지출 분류: {expense_category}"
+            
+            st.code(output, language='plain')
         else:
             st.error("영수증 정보를 추출할 수 없습니다. 다른 영수증 이미지를 시도해 주세요.")
-
