@@ -61,7 +61,7 @@ def trim_file_to_size(filepath, max_size):
 
     return temp_file.name
 
-def transcribe(audio_filepath, response_format='text', prompt=None):
+def transcribe(audio_filepath, language=None, response_format='text', prompt=None):
     # 파일 크기 제한 (25MB)
     # Maximum content size limit는 26214400이지만 여유를 두기 위해 26210000으로 설정
     MAX_FILE_SIZE = 26210000
@@ -72,13 +72,25 @@ def transcribe(audio_filepath, response_format='text', prompt=None):
     # 받아쓰기
     print("Transcribing audio...")
     with open(trimmed_audio_filepath, "rb") as file:
-        transcript = openai_client.audio.transcriptions.create(
-            file=file,
-            model="whisper-1",
-            response_format=response_format,
-            prompt=prompt,
-        )
+        # 매개변수 딕셔너리 생성
+        kwargs = {
+            'file': file,
+            'model': "whisper-1",
+            'response_format': response_format
+        }
 
+        # language가 제공되면 딕셔너리에 추가
+        if language is not None:
+            kwargs['language'] = language
+
+        # prompt가 제공되면 딕셔너리에 추가
+        if prompt is not None:
+            kwargs['prompt'] = prompt
+
+        # 받아쓰기 요청
+        transcript = openai_client.audio.transcriptions.create(**kwargs)
+
+    # 결과 저장
     st.session_state.transcript = transcript
 
     # 임시 파일이 생성되었을 경우 삭제
@@ -117,6 +129,10 @@ prompt = st.text_area(
     value=st.session_state.get('video_info', ''),
     help="Provide a brief description of the video or include specific terms like unique names and key topics to enhance accuracy. This can include spelling out hard-to-distinguish proper nouns."
 )
+
+# 사용자에게 영상의 언어를 선택적으로 입력받는 UI 추가
+language = st.selectbox("Select Language of the Video (optional):", ['', 'Korean', 'English', 'Japanese', 'Chinese', 'Spanish', 'French', 'German'])
+
 response_format = st.selectbox("Select Output Format:", ('text', 'srt', 'vtt'))
 
 # 세션 상태 초기화
@@ -156,7 +172,7 @@ if st.button("Summarize"):
             st.session_state.summary = summarize(
                 st.session_state.transcript,
                 client=openai_client,
-                model="gpt-4-turbo"
+                model="gpt-4o"
             )
 
 # 요약문이 있을 경우, 요약문 필드를 표시
