@@ -110,6 +110,13 @@ def summarize(transcript, client, model):
     print("Summary generated.")
     return response.choices[0].message.content
 
+def extract_dialogues_from_srt(srt_content):
+    lines = srt_content.strip().split('\n')
+    # 2번째 인덱스부터 시작해서 매 4번째 줄마다 추출 (0-based index이므로 실제로는 각 블록의 세 번째 줄)
+    dialogues = [lines[i] for i in range(2, len(lines), 4)]
+    return '\n'.join(dialogues)
+
+
 # Streamlit UI 구성
 st.title("Video Subtitles and Summary Generator")
 
@@ -134,6 +141,7 @@ prompt = st.text_area(
 language = st.selectbox("Select Language of the Video (optional):", ['', 'Korean', 'English', 'Japanese', 'Chinese', 'Spanish', 'French', 'German'])
 
 response_format = st.selectbox("Select Output Format:", ('text', 'srt', 'vtt'))
+st.session_state['response_format'] = response_format
 
 # 세션 상태 초기화
 if 'transcript' not in st.session_state:
@@ -159,10 +167,15 @@ if st.session_state.transcript:
 # "Summarize" 버튼 처리 로직
 if st.button("Summarize"):
     if st.session_state.transcript:
+        transcript_to_summarize = st.session_state.transcript
+        # srt 형식인 경우, 요약 전에 대화 내용만 추출
+        if st.session_state['response_format'] == 'srt':
+            transcript_to_summarize = extract_dialogues_from_srt(transcript_to_summarize)
+
         try:
             # 요약문 생성
             st.session_state.summary = summarize(
-                st.session_state.transcript,
+                transcript_to_summarize,
                 client=upstage_client,
                 model="solar-1-mini-chat"
             )
@@ -170,7 +183,7 @@ if st.button("Summarize"):
             # BadRequestError 발생 시 다른 모델로 재시도
             print("BadRequestError occurred: ", e)
             st.session_state.summary = summarize(
-                st.session_state.transcript,
+                transcript_to_summarize,
                 client=openai_client,
                 model="gpt-4o"
             )
