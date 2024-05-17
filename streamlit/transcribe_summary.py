@@ -1,4 +1,3 @@
-from pydoc import cli
 import streamlit as st
 from pytube import YouTube
 from openai import BadRequestError, OpenAI
@@ -213,11 +212,14 @@ prompt = {
         "Write a comment on the key moments from the transcript in {language}. "
         "Mention the most important or interesting parts and share your thoughts "
         "on them."
+    ),
+    "Critical Review": (
+        "Write a critical review of the transcript in {language}. Evaluate the content, "
+        "discuss its strengths and weaknesses, and provide constructive criticism."
     )
 }
 
 def generate_content(content_type, content_language, transcript, client, model):
-    print(f"Generating {content_type} in {content_language} using {model}...")
     messages = [
         {
             "role": "system",
@@ -230,8 +232,13 @@ def generate_content(content_type, content_language, transcript, client, model):
         },
     ]
 
-    temperature = 0.8 if content_type in["Essay", "Blog article"] else 0.3
+    temperature = 0.5
+    if content_type in ["Essay", "Blog article", "Comment on Key Moments"]:
+        temperature = 0.8
+    elif content_type in ["Simple Summary", "Detailed Summary", "Translation"]:
+        temperature = 0.3
 
+    print(f"Generating {content_type} in {content_language} using {model} with temperature {temperature} ...")
     response = client.chat.completions.create(
         model=model,
         messages=messages,
@@ -263,8 +270,8 @@ if st.button("Generate Content"):
         try:
             model = "gpt-3.5-turbo"
             if (st.session_state.video_language == "ko" and 
-                content_type in ["Detailed summary", 
-                                 "Blog article"]):
+                st.session_state.content_language == "Korean" and
+                content_type in ["Blog article"]):
                 model = "solar-1-mini-chat"
             if content_type in ["Translation", "Comment on Key Moments"]:
                 model = "gpt-4o"
