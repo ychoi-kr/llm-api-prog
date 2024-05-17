@@ -28,9 +28,13 @@ def get_description_fallback(url):
     yt = YouTube(url)
     for n in range(6):
         try:
-            description =  yt.initial_data["engagementPanels"][n]["engagementPanelSectionListRenderer"]["content"]["structuredDescriptionContentRenderer"]["items"][1]["expandableVideoDescriptionBodyRenderer"]["attributedDescriptionBodyText"]["content"]            
+            description = yt.initial_data["engagementPanels"][n][
+                "engagementPanelSectionListRenderer"]["content"][
+                "structuredDescriptionContentRenderer"]["items"][1][
+                "expandableVideoDescriptionBodyRenderer"][
+                "attributedDescriptionBodyText"]["content"]
             return description
-        except:
+        except KeyError:
             continue
     return False
 
@@ -97,26 +101,6 @@ def transcribe(audio_filepath, language=None, response_format='text', prompt=Non
     if trimmed_audio_filepath != audio_filepath:
         os.remove(trimmed_audio_filepath)
 
-def summarize(transcript, client, model):
-    print(f"Summarizing transcript using model: {model}")
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system",
-             "content": f"First, summarize the transcription briefly in the same language in which the original dialogue was spoken. And then, if it is not in Korean, write a Korean summary as well.\n\nFORMAT:\n<summary_in_original_language>\n\nKorean summary:\n<korean_summary>"},
-            {"role": "user", "content": transcript},
-        ],
-    )
-    print("Summary generated.")
-    return response.choices[0].message.content
-
-def extract_dialogues_from_srt(srt_content):
-    lines = srt_content.strip().split('\n')
-    # 2번째 인덱스부터 시작해서 매 4번째 줄마다 추출 (0-based index이므로 실제로는 각 블록의 세 번째 줄)
-    dialogues = [lines[i] for i in range(2, len(lines), 4)]
-    return '\n'.join(dialogues)
-
-
 # Streamlit UI 구성
 st.title("Video Subtitles and Summary Generator")
 
@@ -134,14 +118,33 @@ if st.button("Load Video Info"):
 prompt = st.text_area(
     "What's the video about? (Optional)",
     value=st.session_state.get('video_info', ''),
-    help="Provide a brief description of the video or include specific terms like unique names and key topics to enhance accuracy. This can include spelling out hard-to-distinguish proper nouns."
+    help=(
+        "Provide a brief description of the video or include specific terms like "
+        "unique names and key topics to enhance accuracy. This can include spelling "
+        "out hard-to-distinguish proper nouns."
+    )
 )
 
-# 사용자에게 영상의 언어를 선택적으로 입력받는 UI 추가
-language = st.selectbox("Select Language of the Video (optional):", ['', 'Korean', 'English', 'Japanese', 'Chinese', 'Spanish', 'French', 'German'])
+# 언어 이름과 ISO-639-1 형식 코드를 매핑한 딕셔너리
+language_mapping = {
+    '한국어': 'ko',
+    'English': 'en',
+    '日本語': 'ja',
+    '中文': 'zh',
+    'Español': 'es',
+    'Français': 'fr',
+    'Deutsch': 'de'
+}
 
-response_format = st.selectbox("Select Output Format:", ('text', 'srt', 'vtt'))
-st.session_state['response_format'] = response_format
+# 사용자에게 영상의 언어를 선택적으로 입력하도록 함
+video_language_name = st.selectbox(
+    "Select Language of the Video (optional):", 
+    ['', '한국어', 'English', '日本語', '中文', 'Español', 'Français', 'Deutsch']
+)
+st.session_state.video_language = language_mapping.get(video_language_name, '')
+st.session_state.response_format = st.selectbox(
+    "Select Output Format:", ('text', 'srt', 'vtt')
+    )
 
 # 세션 상태 초기화
 if 'transcript' not in st.session_state:
@@ -149,11 +152,16 @@ if 'transcript' not in st.session_state:
 if 'summary' not in st.session_state:
     st.session_state.summary = ""
 
-if st.button("Generate Subtitles"):
+if st.button("Transcribe Video"):
     if url:
         with st.spinner('Downloading and transcribing video... This may take a while.'):
             filename = download_audio(url)
-            transcribe(filename, response_format=response_format, prompt=prompt)
+            transcribe(
+                filename,
+                language=st.session_state.video_language,
+                response_format=st.session_state.response_format,
+                prompt=prompt
+            )
             os.remove(filename)  # 다운로드한 파일 삭제
         st.success('Done! Subtitles have been generated.')
         print("Transcription completed.")
@@ -164,29 +172,125 @@ if st.button("Generate Subtitles"):
 if st.session_state.transcript:
     st.text_area("Subtitles:", value=st.session_state.transcript, height=300)
 
-# "Summarize" 버튼 처리 로직
-if st.button("Summarize"):
+st.session_state.content_type = st.selectbox(
+    "Select Content Type:", 
+    ["Simple summary", "Detailed summary", "Essay", "Blog article", 
+     "Translation", "Comment on Key Moments"]
+)
+
+st.session_state.content_language = st.selectbox(
+    "Select Language of the Content:", 
+    ['Korean', 'English', 'Japanese', 'Chinese', 'Spanish', 'French', 
+     'German']
+)
+
+
+prompt = {
+    "Simple summary": (
+        "Write a simple piece of the transcript in {language}. Keep it concise "
+        "and highlight only the key points. Avoid detailed explanations."
+    ),
+    "Detailed summary": (
+        "Provide a detailed piece of the transcript in {language}, including key "
+        "points, important details, and any relevant context. Ensure that all "
+        "significant aspects are covered comprehensively."
+    ),
+    "Essay": (
+        "Write an essay based on the transcript in {language}. Provide a thorough "
+        "analysis, include relevant context, and explore the topic in depth."
+    ),
+    "Blog article": (
+        "Write a blog article based on the transcript in {language}. Make it "
+        "engaging and informative, suitable for a general audience. Include "
+        "anecdotes or interesting points to keep the reader's attention."
+    ),
+    "Translation": (
+        "Translate the transcript into {language} without any summarization or "
+        "modification. Keep the translation accurate and true to the original "
+        "text."
+    ),
+    "Comment on Key Moments": (
+        "Write a comment on the key moments from the transcript in {language}. "
+        "Mention the most important or interesting parts and share your thoughts "
+        "on them."
+    )
+}
+
+def generate_content(content_type, content_language, transcript, client, model):
+    print(f"Generating {content_type} in {content_language} using {model}...")
+    messages = [
+        {
+            "role": "system",
+            "content": prompt[content_type].format(language=content_language)
+        },
+        {
+            "role": "user",
+            "content": f"Transcript:\n{transcript}\n\n"
+                       f"{content_type} in {content_language}:"
+        },
+    ]
+
+    temperature = 0.8 if content_type in["Essay", "Blog article"] else 0.3
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+    )
+    print("Content generated.")
+    return response.choices[0].message.content
+
+
+def extract_dialogues_from_srt(srt_content):
+    lines = srt_content.strip().split('\n')
+    # 2번째 인덱스부터 시작해서 매 4번째 줄마다 추출
+    dialogues = [lines[i] for i in range(2, len(lines), 4)]
+    return '\n'.join(dialogues)
+
+
+if st.button("Generate Content"):
     if st.session_state.transcript:
+        content_type = st.session_state.content_type
+        content_language = st.session_state.content_language
         transcript_to_summarize = st.session_state.transcript
-        # srt 형식인 경우, 요약 전에 대화 내용만 추출
+        
+        # Extract dialogues from SRT format before summarizing
         if st.session_state['response_format'] == 'srt':
-            transcript_to_summarize = extract_dialogues_from_srt(transcript_to_summarize)
+            transcript_to_summarize = extract_dialogues_from_srt(
+                transcript_to_summarize
+            )
 
         try:
-            # 요약문 생성
-            st.session_state.summary = summarize(
+            model = "gpt-3.5-turbo"
+            if (st.session_state.video_language == "ko" and 
+                content_type in ["Detailed summary", 
+                                 "Blog article"]):
+                model = "solar-1-mini-chat"
+            if content_type in ["Translation", "Comment on Key Moments"]:
+                model = "gpt-4o"
+            
+            client = (upstage_client if model == "solar-1-mini-chat" 
+                      else openai_client)
+
+            # Generate summary
+            st.session_state.summary = generate_content(
+                content_type,
+                content_language,
                 transcript_to_summarize,
-                client=upstage_client,
-                model="solar-1-mini-chat"
+                client=client,
+                model=model
             )
         except BadRequestError as e:
-            # BadRequestError 발생 시 다른 모델로 재시도
+            # Retry with a different model on BadRequestError
             print("BadRequestError occurred: ", e)
-            st.session_state.summary = summarize(
+            st.session_state.summary = generate_content(
+                content_type,
+                content_language,
                 transcript_to_summarize,
                 client=openai_client,
                 model="gpt-4o"
             )
+
 
 # 요약문이 있을 경우, 요약문 필드를 표시
 if st.session_state.summary:
