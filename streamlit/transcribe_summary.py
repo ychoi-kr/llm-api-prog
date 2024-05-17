@@ -1,8 +1,15 @@
+import os
+import time
+import tempfile
+from turtle import up
+
+from numpy import source
 import streamlit as st
 from pytube import YouTube
-from openai import BadRequestError, OpenAI
-import os
-import tempfile
+from openai import OpenAI
+from openai import APITimeoutError, BadRequestError
+import tiktoken
+from torch import ge
 
 
 # 클라이언트 초기화
@@ -14,6 +21,7 @@ upstage_client = OpenAI(
     base_url="https://api.upstage.ai/v1/solar"
 )
 
+
 def get_video_info(url):
     yt = YouTube(url)
     title = yt.title
@@ -21,6 +29,7 @@ def get_video_info(url):
     description = yt.description if yt.description else get_description_fallback(url)
     print(f"\nTitle: {title}\nDescription: {description}")
     return title, description
+
 
 # https://github.com/pytube/pytube/issues/1626#issuecomment-1775501965
 def get_description_fallback(url):
@@ -37,10 +46,27 @@ def get_description_fallback(url):
             continue
     return False
 
+
 def download_audio(url):
     print("Downloading audio...")
-    video = YouTube(url).streams.filter(only_audio=True).first().download()
-    return video
+    max_retries = 3
+    retry_delay = 5  # seconds
+
+    for retry in range(max_retries):
+        try:
+            video = YouTube(url).streams.filter(only_audio=True).first().download()
+            return video
+        except Exception as e:
+            print(f"Error occurred while downloading audio: {str(e)}")
+            if retry < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds... (Attempt {retry + 1} of {max_retries})")
+                time.sleep(retry_delay)
+            else:
+                print(f"Max retries reached. Unable to download audio.")
+                raise
+
+    return None
+
 
 def trim_file_to_size(filepath, max_size):
     file_size = os.path.getsize(filepath)
@@ -101,7 +127,7 @@ def transcribe(audio_filepath, language=None, response_format='text', prompt=Non
         os.remove(trimmed_audio_filepath)
 
 # Streamlit UI 구성
-st.title("Video Subtitles and Summary Generator")
+st.title("YouTube Transcription and Content Generation")
 
 url = st.text_input("Enter Video URL:")
 
@@ -186,40 +212,179 @@ st.session_state.content_language = st.selectbox(
 
 prompt = {
     "Simple summary": (
-        "Write a simple piece of the transcript in {language}. Keep it concise "
-        "and highlight only the key points. Avoid detailed explanations."
+        "Write a simple summary in {language}. Keep it concise and highlight "
+        "only the key points. Avoid detailed explanations."
     ),
     "Detailed summary": (
-        "Provide a detailed piece of the transcript in {language}, including key "
-        "points, important details, and any relevant context. Ensure that all "
+        "Provide a detailed summary in {language}, including key points, "
+        "important details, and any relevant context. Ensure that all "
         "significant aspects are covered comprehensively."
     ),
     "Essay": (
-        "Write an essay based on the transcript in {language}. Provide a thorough "
+        "Write an essay based on the content in {language}. Provide a thorough "
         "analysis, include relevant context, and explore the topic in depth."
     ),
     "Blog article": (
-        "Write a blog article based on the transcript in {language}. Make it "
+        "Write a blog article based on the content in {language}. Make it "
         "engaging and informative, suitable for a general audience. Include "
         "anecdotes or interesting points to keep the reader's attention."
     ),
     "Translation": (
-        "Translate the transcript into {language} without any summarization or "
+        "Translate the content into {language} without any summarization or "
         "modification. Keep the translation accurate and true to the original "
         "text."
     ),
     "Comment on Key Moments": (
-        "Write a comment on the key moments from the transcript in {language}. "
-        "Mention the most important or interesting parts and share your thoughts "
-        "on them."
+        "Write a comment on the key moments from the content in {language}. "
+        "Mention the most important or interesting parts and share your "
+        "thoughts on them."
     ),
     "Critical Review": (
-        "Write a critical review of the transcript in {language}. Evaluate the content, "
-        "discuss its strengths and weaknesses, and provide constructive criticism."
+        "Write a critical review of the content in {language}. Evaluate the "
+        "content, discuss its strengths and weaknesses, and provide "
+        "constructive criticism."
     )
 }
 
-def generate_content(content_type, content_language, transcript, client, model):
+
+def get_tokenizer(model_name):
+    if model_name.startswith("gpt"):
+        return tiktoken.encoding_for_model(model_name)
+    else:
+        # 정확하게 하려면 모델별 토큰화기를 달리해야 하지만 여기서는 간단하게 처리
+        return tiktoken.encoding_for_model("gpt-3.5-turbo")
+
+
+def split_into_chunks(text, max_tokens, tokenizer):
+    print(f"Checking if transcript fits within the token limit of {max_tokens}...")
+    paragraphs = text.split('\n\n')
+    chunks = []
+    current_chunk = []
+    current_chunk_tokens = 0
+
+    for paragraph in paragraphs:
+        paragraph_tokens = len(tokenizer.encode(paragraph))
+
+        if current_chunk_tokens + paragraph_tokens <= max_tokens:
+            current_chunk.append(paragraph)
+            current_chunk_tokens += paragraph_tokens
+        else:
+            if current_chunk:
+                chunks.append('\n\n'.join(current_chunk))
+            current_chunk = [paragraph]
+            current_chunk_tokens = paragraph_tokens
+
+    if current_chunk:
+        chunks.append('\n\n'.join(current_chunk))
+
+    if len(chunks) > 1:
+        print(f"Split transcript into {len(chunks)} chunks.")
+    
+    return chunks
+
+
+def translate(source_text, source_language_code, target_language_name):
+    print(f"Translating {source_language_code} text into {target_language_name} ...")
+    
+    content_type = "Translation"
+    temperature = 0.4
+
+    preferred_model = ""
+    if source_language_code == "en" and target_language_name == "Korean":
+        preferred_model = "solar-1-mini-translate-enko"
+    elif source_language_code == "ko" and target_language_name == "English":
+        preferred_model = "solar-1-mini-translate-koen"
+    else:
+        preferred_model = "gpt-3.5-turbo"
+    
+    fallback_model = "gpt-4-turbo"
+
+    client = upstage_client if preferred_model.startswith("solar") else openai_client
+
+    chunk_size = 2048  # 실험 결과에 따라 조정
+    tokenizer = get_tokenizer("gpt-3.5-turbo")
+    chunks = split_into_chunks(source_text, chunk_size, tokenizer)
+    
+    results = []
+    progress_text = "Translation progress"
+    my_bar = st.progress(0, text=progress_text)
+
+    for i, chunk in enumerate(chunks, start=1):
+        messages = []
+        if preferred_model in ["solar-1-mini-translate-enko", 
+                                "solar-1-mini-translate-koen"]:
+            messages = [
+                {
+                    "role": "user",
+                    "content": chunk
+                }
+            ]
+        else:
+            messages = [
+                {
+                    "role": "system",
+                    "content": prompt[content_type].format(language=target_language_name)
+                },
+                {
+                    "role": "user",
+                    "content": (f"Transcript:\n{chunk}\n\n"
+                                f"{content_type} in {target_language_name}:")
+                }
+            ]
+
+        try:
+            response = client.chat.completions.create(
+                model=preferred_model,
+                messages=messages,
+                temperature=temperature
+            )
+        except BadRequestError as e:
+            print("BadRequestError occurred: ", e)
+            print(f"Retrying translation using {fallback_model} ...")
+            response = client.chat.completions.create(
+                model=fallback_model,
+                messages=messages,
+                temperature=temperature
+            )
+        finally:
+            results.append(response.choices[0].message.content)
+            progress = i / len(chunks)
+            my_bar.progress(progress, text=f"{progress_text} {progress:.0%}")
+
+    print("Translation completed.")
+    return "\n".join(results)
+
+
+def generate_content(content_type, content_language, transcript_language_code, transcript_format, transcript):
+    if content_type == "Translation":
+        return translate(transcript, transcript_language_code, content_language)
+    
+    tokenizer = get_tokenizer("gpt-3.5-turbo")
+    num_tokens = len(tokenizer.encode(transcript))
+
+    margin = 3000 if content_type in ["Detailed Summary", "Essay", "Blog article"] else 1000
+
+    preferred_model = ""
+    if num_tokens < 16385 - margin:
+        preferred_model = "gpt-3.5-turbo"
+    elif num_tokens < 32768 - margin:
+        preferred_model = "solar-1-mini-chat"
+    else:
+        preferred_model = "gpt-4o"
+    
+    fallback_model = "gpt-4-turbo"
+
+    temperature = 0.5
+    if content_type in ["Essay", "Blog article", "Comment on Key Moments"]:
+        temperature = 0.8
+    elif content_type in ["Simple Summary", "Detailed Summary"]:
+        temperature = 0.4
+
+    if transcript_format == "srt":
+        transcript = extract_dialogues_from_srt(transcript)
+    
+    print(f"Generating {content_type} in {content_language} with temperature {temperature} ...")
+    
     messages = [
         {
             "role": "system",
@@ -227,25 +392,34 @@ def generate_content(content_type, content_language, transcript, client, model):
         },
         {
             "role": "user",
-            "content": f"Transcript:\n{transcript}\n\n"
-                       f"{content_type} in {content_language}:"
-        },
+            "content": (f"Transcript:\n{transcript}\n\n"
+                        f"{content_type} in {content_language}:")
+        }
     ]
+    
+    result = ""
+    try:
+        print(f"Attempting to generate content using {preferred_model} ...")
+        client = upstage_client if preferred_model.startswith("solar") else openai_client
+        response = client.chat.completions.create(
+            model=preferred_model,
+            messages=messages,
+            temperature=temperature
+        )
+        result = response.choices[0].message.content
+    except BadRequestError as e:
+        print("BadRequestError occurred: ", e)
+        print(f"Retrying content generation using {fallback_model} ...")
+        client = openai_client
+        response = client.chat.completions.create(
+            model=fallback_model,
+            messages=messages,
+            temperature=temperature
+        )
+        result = response.choices[0].message.content
 
-    temperature = 0.5
-    if content_type in ["Essay", "Blog article", "Comment on Key Moments"]:
-        temperature = 0.8
-    elif content_type in ["Simple Summary", "Detailed Summary", "Translation"]:
-        temperature = 0.3
-
-    print(f"Generating {content_type} in {content_language} using {model} with temperature {temperature} ...")
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-    )
     print("Content generated.")
-    return response.choices[0].message.content
+    return result
 
 
 def extract_dialogues_from_srt(srt_content):
@@ -258,47 +432,18 @@ def extract_dialogues_from_srt(srt_content):
 if st.button("Generate Content"):
     if st.session_state.transcript:
         content_type = st.session_state.content_type
-        content_language = st.session_state.content_language
-        transcript_to_summarize = st.session_state.transcript
         
-        # Extract dialogues from SRT format before summarizing
-        if st.session_state['response_format'] == 'srt':
-            transcript_to_summarize = extract_dialogues_from_srt(
-                transcript_to_summarize
-            )
-
-        try:
-            model = "gpt-3.5-turbo"
-            if (st.session_state.video_language == "ko" and 
-                st.session_state.content_language == "Korean" and
-                content_type in ["Blog article"]):
-                model = "solar-1-mini-chat"
-            if content_type in ["Translation", "Comment on Key Moments"]:
-                model = "gpt-4o"
-            
-            client = (upstage_client if model == "solar-1-mini-chat" 
-                      else openai_client)
-
-            # Generate summary
-            st.session_state.summary = generate_content(
+        with st.spinner(f'\nGenerating {content_type}...'):
+            generated_content = generate_content(
                 content_type,
-                content_language,
-                transcript_to_summarize,
-                client=client,
-                model=model
+                st.session_state.content_language,
+                st.session_state.video_language,
+                st.session_state.response_format,
+                st.session_state.transcript
             )
-        except BadRequestError as e:
-            # Retry with a different model on BadRequestError
-            print("BadRequestError occurred: ", e)
-            st.session_state.summary = generate_content(
-                content_type,
-                content_language,
-                transcript_to_summarize,
-                client=openai_client,
-                model="gpt-4o"
-            )
-
+            st.session_state.summary = generated_content
+        st.success('Content generation completed!')
 
 # 요약문이 있을 경우, 요약문 필드를 표시
 if st.session_state.summary:
-    st.text_area("Summary:", value=st.session_state.summary, height=150)
+    st.text_area("Summary:", value=st.session_state.summary, height=300)
