@@ -329,6 +329,9 @@ def translate(source_text, source_language_code, target_language_name):
     content_type = "Translation"
     temperature = 0.4
 
+    if source_language_code == '':
+        preferred_model = "gpt-3.5-turbo"
+        print("Source language code not provided.")
     preferred_model = ""
     if source_language_code == "en" and target_language_name == "Korean":
         preferred_model = "solar-1-mini-translate-enko"
@@ -336,8 +339,10 @@ def translate(source_text, source_language_code, target_language_name):
         preferred_model = "solar-1-mini-translate-koen"
     else:
         preferred_model = "gpt-3.5-turbo"
+    print("Preferred model:", preferred_model)
     
     fallback_model = "gpt-4-turbo"
+    print("Fallback model:", fallback_model)
 
     client = upstage_client if preferred_model.startswith("solar") else openai_client
 
@@ -347,7 +352,10 @@ def translate(source_text, source_language_code, target_language_name):
     
     results = []
     progress_text = "Translation progress"
-    my_bar = st.progress(0, text=progress_text)
+
+    progress_bar = None
+    if len(chunks) > 1:
+        progress_bar = st.progress(0, text=progress_text)
     
     for i, chunk in enumerate(chunks, start=1):
         messages = []
@@ -371,8 +379,11 @@ def translate(source_text, source_language_code, target_language_name):
                                 f"{content_type} in {target_language_name}:")
                 }
             ]
+        
+        progress = i / len(chunks)
 
         try:
+            print(f"Attempting to translate chunk {i} using {preferred_model} ...")
             response = client.chat.completions.create(
                 model=preferred_model,
                 messages=messages,
@@ -380,18 +391,19 @@ def translate(source_text, source_language_code, target_language_name):
             )
         except BadRequestError as e:
             print("BadRequestError occurred: ", e)
-            print(f"Retrying translation using {fallback_model} ...")
+            print(f"Retrying translation chunk {i} using {fallback_model} ...")
             response = client.chat.completions.create(
                 model=fallback_model,
                 messages=messages,
                 temperature=temperature
             )
         finally:
-            results.append(response.choices[0].message.content)
-            progress = i / len(chunks)
-            my_bar.progress(progress, text=f"{progress_text} {progress:.0%}")
+            translated_chunk = response.choices[0].message.content            
+            results.append(translated_chunk)
+            if progress_bar:
+                progress_bar.progress(progress, text=f"{progress_text} {progress:.0%}")
     
-    print("Translation completed.")
+    print("Translation completed.\n")
     return "\n".join(results)
 
 
@@ -459,7 +471,7 @@ def generate_content(content_type, content_language, transcript_language_code, t
         )
         result = response.choices[0].message.content
 
-    print("Content generated.")
+    print("Content generated.\n")
     return result
 
 
