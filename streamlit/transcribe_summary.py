@@ -1,15 +1,13 @@
+import re
 import os
 import time
 import tempfile
-from turtle import up
 
-from numpy import source
 import streamlit as st
 from pytube import YouTube
 from openai import OpenAI
-from openai import APITimeoutError, BadRequestError
+from openai import BadRequestError
 import tiktoken
-from torch import ge
 
 
 # 클라이언트 초기화
@@ -22,12 +20,53 @@ upstage_client = OpenAI(
 )
 
 
+def extract_keywords(title, description):
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Split text into lines and tag each line with labels such as "
+                "'title', 'video_description', 'channel_description', 'tags', "
+                "'timestamps', 'promotion', 'links', 'etc' in XML format. "
+                "And then, extract the keywords from the 'title' and "
+                "'video_description' tags and include them in a single "
+                "'<keywords>' tag as a comma-separated list."
+            )
+        },
+        {
+            "role": "user",
+            "content": f"{title}\n\n{description}\n\n"
+        }
+    ]
+    
+    response = openai_client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=messages,
+        temperature=0.5
+    )
+    
+    xml_content = response.choices[0].message.content
+    print("XML content:", xml_content)
+
+    # <keywords> 태그 안의 내용만 추출
+    keywords = re.search(
+        r'<keywords>(.*?)</keywords>',
+        xml_content,
+        re.DOTALL
+    )
+    
+    if keywords:
+        return keywords.group(1).strip()
+    else:
+        st.info("No keywords found in the content.")
+        return ""
+
+
 def get_video_info(url):
     yt = YouTube(url)
     title = yt.title
     # pytube에서 description을 가져오지 못하는 경우, fallback으로 description을 가져옴
     description = yt.description if yt.description else get_description_fallback(url)
-    print(f"\nTitle: {title}\nDescription: {description}")
     return title, description
 
 
@@ -135,13 +174,14 @@ url = st.text_input("Enter Video URL:")
 if st.button("Load Video Info"):
     if url:
         title, description = get_video_info(url)
-        st.session_state.video_info = f"Title: {title}\nDescription: {description}"
+        transcription_prompt = extract_keywords(title, description)
+        st.session_state.video_info = transcription_prompt
     else:
         st.error("Please enter a valid YouTube URL.")
 
 # 영상 정보를 프롬프트에 표시
 prompt = st.text_area(
-    "What's the video about? (Optional)",
+    "What's in the video? (Optional)",
     value=st.session_state.get('video_info', ''),
     help=(
         "Provide a brief description of the video or include specific terms like "
@@ -169,14 +209,14 @@ video_language_name = st.selectbox(
 st.session_state.video_language = language_mapping.get(video_language_name, '')
 st.session_state.response_format = st.selectbox(
     "Select Output Format:", ('text', 'srt', 'vtt')
-    )
+)
 
 # 세션 상태 초기화
 if 'transcript' not in st.session_state:
     st.session_state.transcript = ""
 if 'summary' not in st.session_state:
-    st.session_state.summary = ""
-
+     st.session_state.summary = ""
+     
 if st.button("Transcribe Video"):
     if url:
         with st.spinner('Downloading and transcribing video... This may take a while.'):
@@ -200,7 +240,7 @@ if st.session_state.transcript:
 st.session_state.content_type = st.selectbox(
     "Select Content Type:", 
     ["Simple summary", "Detailed summary", "Essay", "Blog article", 
-     "Translation", "Comment on Key Moments"]
+     "Translation", "Comment on Key Moments", "Critical Review"]
 )
 
 st.session_state.content_language = st.selectbox(
@@ -301,14 +341,14 @@ def translate(source_text, source_language_code, target_language_name):
 
     client = upstage_client if preferred_model.startswith("solar") else openai_client
 
-    chunk_size = 2048  # 실험 결과에 따라 조정
+    chunk_size = 1024  # 실험 결과에 따라 조정
     tokenizer = get_tokenizer("gpt-3.5-turbo")
     chunks = split_into_chunks(source_text, chunk_size, tokenizer)
     
     results = []
     progress_text = "Translation progress"
     my_bar = st.progress(0, text=progress_text)
-
+    
     for i, chunk in enumerate(chunks, start=1):
         messages = []
         if preferred_model in ["solar-1-mini-translate-enko", 
@@ -350,12 +390,13 @@ def translate(source_text, source_language_code, target_language_name):
             results.append(response.choices[0].message.content)
             progress = i / len(chunks)
             my_bar.progress(progress, text=f"{progress_text} {progress:.0%}")
-
+    
     print("Translation completed.")
     return "\n".join(results)
 
 
 def generate_content(content_type, content_language, transcript_language_code, transcript_format, transcript):
+    
     if content_type == "Translation":
         return translate(transcript, transcript_language_code, content_language)
     
