@@ -1,59 +1,48 @@
-# 다음 영상의 코드를 수정함.
-# Stream LLMs with LangChain + Streamlit | Tutorial
-# https://www.youtube.com/watch?v=zKGeRWjJlTU
-
-import streamlit as st
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_community.chat_message_histories import StreamlitChatMessageHistory
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_openai import ChatOpenAI
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+import streamlit as st
 
-st.set_page_config(page_title="Streaming Bot", page_icon="🤖")
+st.title("스트림릿 랭체인 챗봇 예제")
 
-st.title("Streaming Bot")
+# 메모리 설정
+msgs = StreamlitChatMessageHistory()
+if len(msgs.messages) == 0:
+    msgs.add_ai_message("안녕하세요?")
 
-def get_response(query, chat_history):
-    template = """
-        You are a helpful assistant. Answer the following questions considering the context of the conversation.
-        
-        Chat history: {chat_history}
-        
-        User question: {user_question}
-        """
-    
-    prompt = ChatPromptTemplate.from_template(template)
-    
-    llm = ChatOpenAI(
-        model="gpt-4-turbo-preview",
-        api_key=st.secrets["OPENAI_API_KEY"]
-    )
+# 메시지 히스토리를 전달해 랭체인을 설정
 
-    chain = prompt | llm | StrOutputParser()
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "You are an AI chatbot having a conversation with a human."),
+        MessagesPlaceholder(variable_name="history"),
+        ("human", "{question}"),
+    ]
+)
 
-    return chain.stream({
-        "chat_history": chat_history,
-        "user_question": query
-    })
-    
-for message in st.session_state.chat_history:
-    if isinstance(message, HumanMessage):
-        with st.chat_message("Human"):
-            st.markdown(message.content)
-    else:
-        with st.chat_message("AI"):
-            st.markdown(message.content)
+llm = ChatOpenAI(
+    model="gpt-4o",
+    api_key=st.secrets["OPENAI_API_KEY"]
+)
 
-user_query = st.chat_input("Your message")
-if user_query is not None and user_query != "":
-    st.session_state.chat_history.append(HumanMessage(content=user_query))
+chain = prompt | llm
+chain_with_history = RunnableWithMessageHistory(
+    chain,
+    lambda session_id: msgs,
+    input_messages_key="question",
+    history_messages_key="history",
+)
 
-    with st.chat_message("Human"):
-        st.markdown(user_query)
+# StreamlitChatMessageHistory에서 현재 메시지 렌더링
+for msg in msgs.messages:
+    st.chat_message(msg.type).write(msg.content)
 
-    with st.chat_message("AI"):
-        ai_response = st.write_stream(get_response(user_query, st.session_state.chat_history))
-
-    st.session_state.chat_history.append(AIMessage(content=ai_response))
+# 사용자가 새 프롬프트를 입력하면 새 응답을 생성하고 그리기
+if prompt := st.chat_input():
+    st.chat_message("human").write(prompt)
+    # 새 메시지는 실행 중 랭체인에 의해 자동으로 기록됨
+    config = {"configurable": {"session_id": "any"}}
+    response = chain_with_history.invoke({"question": prompt}, config)
+    st.chat_message("ai").write(response.content)
