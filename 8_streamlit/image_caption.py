@@ -38,7 +38,7 @@ if uploaded_image is not None:
         }
 
         payload = {
-            "model": "gpt-4-vision-preview",
+            "model": "gpt-4o",
             "messages": [
                 {
                     "role": "user",
@@ -58,4 +58,4 @@ if uploaded_image is not None:
             st.success("이미지 설명 생성 완료!")
             st.write(description)
         else:
-            st.error("이미지를 분석할 수 없습니다. 다른 이미지를 시도해주세요.")
+            st.error("이미지를 분석할 수 없습니다.")
