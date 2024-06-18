@@ -1,7 +1,7 @@
 from vertexai.generative_models import GenerativeModel, Part
 import vertexai
    
-vertexai.init(project="robotic-vista-415814", location="asia-northeast3")
+vertexai.init(project="your-project-id", location="asia-northeast3") 
 model = GenerativeModel("gemini-1.5-flash-preview-0514")
 
 prompt = """
@@ -19,4 +19,3 @@ contents = [prompt, video]
 
 response = model.generate_content(contents)
 print(response.text.strip())
-
