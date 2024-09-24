@@ -1,0 +1,27 @@
+# Visual Studio 관련 파일
+.vs/
+
+# 빌드 아티팩트
+**/bin/
+**/obj/
+
+# NuGet 관련 파일
+**/OpenAIExample.csproj.nuget.dgspec.json
+OpenAIExample.csproj.nuget.g.props
+OpenAIExample.csproj.nuget.g.targets
+project.assets.json
+project.nuget.cache
+
+# 제외할 빌드 결과물
+*.dll
+*.exe
+*.pdb
+*.runtimeconfig.json
+
+# 기타
+*.suo
+*.dtbcache.v2
+*.vsidx
+.futdcache.v2
+DocumentLayout.json
+
