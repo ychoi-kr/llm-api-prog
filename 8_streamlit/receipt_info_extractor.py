@@ -8,14 +8,14 @@ from openai import OpenAI
 api_key = st.secrets['UPSTAGE_API_KEY']
 
 def extract_receipt_info(image):    
-    url = "https://api.upstage.ai/v1/document-ai/extraction/receipt"
+    url = "https://api.upstage.ai/v1/document-ai/extraction"
     headers = {"Authorization": f"Bearer {api_key}"}
     
     buffered = BytesIO()
     image.save(buffered, format="JPEG")
     files = {"document": buffered.getvalue()}
-    
-    response = requests.post(url, headers=headers, files=files)
+    data = {"model": "receipt-extraction"}
+    response = requests.post(url, headers=headers, files=files, data=data)
     return response.json()
 
 def classify_expense(expense_details):
@@ -64,33 +64,57 @@ if uploaded_image is not None:
             total_amount = None
             payment_method = None
             card_number = None
+            store_name = None
             
-            for field in receipt_data['fields']:
-                #print(field)
-                if field['key'].startswith('group'):
+            for field in receipt_data.get('fields', []):
+                print(field)
+                key = field.get('key', '')
+                field_type = field.get('type', '')
+                value = field.get('refinedValue', field.get('value', ''))
+                confidence = field.get('confidence', 0)
+
+                if key.startswith('group'):
                     product_name = None
                     product_price = None
-                    for prop in field['properties']:
-                        if prop['key'].endswith('product_name'):
-                            product_name = prop['value']
-                        elif prop['key'].endswith('unit_product_total_price_before_discount'):
-                            product_price = prop['value']
+                    for prop in field.get('properties', []):
+                        prop_key = prop.get('key', '')
+                        prop_value = prop.get('refinedValue', prop.get('value', ''))
+                        if prop_key.endswith('product_name'):
+                            product_name = prop_value
+                        elif prop_key.endswith('unit_product_total_price_before_discount'):
+                            product_price = prop_value
                     if product_name and product_price:
                         expense_details.append(f"{product_name}: {product_price}")
-                elif field['key'] == 'date.date':
-                    date = field['value']
-                elif field['key'] == 'transaction.transaction_date' and field['type'] == 'content':
-                    date = field['value']
-                elif field['key'] == 'total.charged_price' and field['type'] == 'content':
-                    total_amount = field['value']
-                elif field['key'] == 'transaction.cc_code' and field['type'] == 'content':
-                    payment_method = field['value']
-                elif field['key'] == 'total.card_payment_price' and field['type'] == 'header':
-                    if '쿠페이' in field['value']:
+                
+                # 거래일시
+                elif key == 'transaction.transaction_date' and field_type == 'content':
+                    date = value
+                elif key == 'date.date' and not date:
+                    date = value
+
+                # 총금액
+                elif key == 'total.charged_price' and field_type == 'content':
+                    total_amount = value
+                elif not total_amount and key in ['total.card_payment_price', 'total.tax_price', 'total.subtotal_price'] and field_type == 'content':
+                    total_amount = value
+                
+                # 지불 수단
+                elif key == 'transaction.cc_code' and field_type == 'content':
+                    payment_method = value
+                elif key == 'total.card_payment_price' and field_type == 'header':
+                    if '쿠페이' in value:
                         payment_method = '쿠페이'
-                elif field['key'] == 'payment.credit_card_number':
-                    card_number = field['value']
+                
+                # 카드 번호
+                elif key == 'payment.credit_card_number':
+                    card_number = value
+                elif key == 'transaction.cc_number' and field_type == 'content':
+                    card_number = value
             
+            print("\n")
+
+            if not expense_details and store_name:
+                expense_details.append(store_name)
             expense_category = classify_expense(expense_details)
             
             output = f"지출 상세 내역:\n"
