@@ -104,6 +104,8 @@ if uploaded_image is not None:
                 elif not total_amount and key in ['total.card_payment_price', 'total.tax_price', 'total.subtotal_price'] and field_type == 'content':
                     if value.replace(',', '').isdigit():
                         total_amount = value
+                elif key == 'total.payment_price' and field_type == 'content':
+                    total_amount = value
                 
                 # 지불 수단
                 elif key == 'transaction.cc_code' and field_type == 'content':
