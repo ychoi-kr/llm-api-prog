@@ -22,11 +22,11 @@ def classify_expense(expense_details):
     client = OpenAI(api_key=api_key, base_url="https://api.upstage.ai/v1/solar")
     
     expense_text = ", ".join(expense_details)
-    
+
     response = client.chat.completions.create(
         model="solar-1-mini-chat",
         messages=[
-            {"role": "system", "content": "지출 내역을 읽고, 생활비, 주거비, 교육양육비, 교통비, 통신비, 문화여가비, 기타 지출 중 하나로 분류하세요. 식재료는 '생활비 - 식비'로 분류하고, 식당에서 사 먹거나 배달시킬 경우에는 '생활비 - 외식비'로 분류하세요. 전체 지출 내역을 단 한 가지로 분류해야 하며, 상세 내역이나 설명을 출력하지 마세요."},
+            {"role": "system", "content": "지출 내역이나 매장 이름을 읽고, 생활비, 주거비, 교육양육비, 교통비, 통신비, 문화여가비, 기타 지출 중 하나로 분류하세요. 식재료는 '생활비 - 식비'로, 식당에서 사 먹거나 배달시킬 경우에는 '생활비 - 외식비'로, 안경이나 렌즈 구매는 '생활비 - 의료비'로 분류하세요. 전체 지출 내역을 단 한 가지로 분류해야 하며, 상세 내역이나 설명을 출력하지 마세요."},
             {"role": "user", "content": expense_text}
         ],
         stop='.',
@@ -60,6 +60,7 @@ if uploaded_image is not None:
             st.success("영수증 정보 추출 완료!")
             
             expense_details = []
+            store_name = None
             date = None
             total_amount = None
             payment_method = None
@@ -85,7 +86,11 @@ if uploaded_image is not None:
                             product_price = prop_value
                     if product_name and product_price:
                         expense_details.append(f"{product_name}: {product_price}")
-                
+
+                # 상호명
+                elif key == 'store.store_name' and field_type == 'content':
+                    store_name = value
+
                 # 거래일시
                 elif key == 'transaction.transaction_date' and field_type == 'content':
                     date = value
@@ -111,17 +116,26 @@ if uploaded_image is not None:
                 elif key == 'transaction.cc_number' and field_type == 'content':
                     card_number = value
             
-            print("\n")
-
-            if not expense_details and store_name:
-                expense_details.append(store_name)
-            expense_category = classify_expense(expense_details)
+            # 지출 분류를 위한 입력 데이터 설정
+            if expense_details:
+                classification_input = expense_details
+            elif store_name:
+                classification_input = [store_name]
+            else:
+                classification_input = []
             
-            output = f"지출 상세 내역:\n"
-            for detail in expense_details:
-                output += f"- {detail}\n"
+            print(classification_input, end="\n\n")
+            expense_category = classify_expense(classification_input)
             
+            output = ""            
+            output += f"상호명: {store_name if store_name else '찾을 수 없음'}"            
             output += f"\n거래일시: {date if date else '찾을 수 없음'}"
+            
+            if expense_details:
+                output += "\n\n지출 상세 내역:\n"
+                for detail in expense_details:
+                    output += f"- {detail}\n"
+
             output += f"\n합계 금액: {total_amount if total_amount else '찾을 수 없음'}"
             output += f"\n지불 수단: {payment_method if payment_method else '찾을 수 없음'}"
             output += f"\n카드 번호: {card_number if card_number else '찾을 수 없음'}"
