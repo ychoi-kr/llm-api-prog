@@ -7,7 +7,7 @@ from openai import OpenAI
 
 api_key = st.secrets['UPSTAGE_API_KEY']
 
-def extract_receipt_info(image):    
+def extract_receipt_info(image): 
     url = "https://api.upstage.ai/v1/document-ai/extraction"
     headers = {"Authorization": f"Bearer {api_key}"}
     
@@ -34,6 +34,7 @@ def classify_expense(expense_details):
     
     return response.choices[0].message.content.strip('.')
 
+
 st.title("영수증 정보 추출기")
 uploaded_image = st.file_uploader("영수증 이미지를 업로드하세요:", type=["jpg", "jpeg", "png"])
 
@@ -52,7 +53,7 @@ if uploaded_image is not None:
             image = image.rotate(90, expand=True)
     
     st.image(image, caption='업로드된 영수증 이미지', use_column_width=True)
-    
+
     if st.button("영수증 정보 추출"):
         receipt_data = extract_receipt_info(image)
         
@@ -65,15 +66,13 @@ if uploaded_image is not None:
             total_amount = None
             payment_method = None
             card_number = None
-            store_name = None
             
             for field in receipt_data.get('fields', []):
-                print(field)
                 key = field.get('key', '')
                 field_type = field.get('type', '')
                 value = field.get('refinedValue', field.get('value', ''))
-                confidence = field.get('confidence', 0)
-
+                print(f"{key}: {value}")
+                
                 if key.startswith('group'):
                     product_name = None
                     product_price = None
@@ -93,15 +92,18 @@ if uploaded_image is not None:
 
                 # 거래일시
                 elif key == 'transaction.transaction_date' and field_type == 'content':
-                    date = value
-                elif key == 'date.date' and not date:
-                    date = value
+                    if not date:
+                        date = value
+                elif key == 'date.date' and field_type == 'content':
+                    if not date:
+                        date = value
 
                 # 총금액
                 elif key == 'total.charged_price' and field_type == 'content':
                     total_amount = value
                 elif not total_amount and key in ['total.card_payment_price', 'total.tax_price', 'total.subtotal_price'] and field_type == 'content':
-                    total_amount = value
+                    if value.replace(',', '').isdigit():
+                        total_amount = value
                 
                 # 지불 수단
                 elif key == 'transaction.cc_code' and field_type == 'content':
@@ -124,11 +126,10 @@ if uploaded_image is not None:
             else:
                 classification_input = []
             
-            print(classification_input, end="\n\n")
             expense_category = classify_expense(classification_input)
             
             output = ""            
-            output += f"상호명: {store_name if store_name else '찾을 수 없음'}"            
+            output += f"상호명: {store_name if store_name else '찾을 수 없음'}"
             output += f"\n거래일시: {date if date else '찾을 수 없음'}"
             
             if expense_details:
