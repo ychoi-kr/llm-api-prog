@@ -1,13 +1,13 @@
-import re
 import os
 import time
 import tempfile
 
 import streamlit as st
-from pytube import YouTube
+from pytubefix import YouTube
 from openai import OpenAI
 from openai import BadRequestError
 import tiktoken
+from pydantic import BaseModel  # Import pydantic for schema definitions
 
 
 # 클라이언트 초기화
@@ -20,45 +20,44 @@ upstage_client = OpenAI(
 )
 
 
+# Define the JSON schema using pydantic
+class KeywordExtractionResponse(BaseModel):
+    keywords: list[str]
+
+
 def extract_keywords(title, description):
+    # Create the messages for the chat completion
     messages = [
         {
             "role": "system",
             "content": (
-                "Split text into lines and tag each line with labels such as "
-                "'title', 'video_description', 'channel_description', 'tags', "
-                "'timestamps', 'promotion', 'links', 'etc' in XML format. "
-                "And then, extract the keywords from the 'title' and "
-                "'video_description' tags and include them in a single "
-                "'<keywords>' tag as a comma-separated list."
+                "You are a helpful assistant that extracts keywords from video titles and descriptions."
             )
         },
         {
             "role": "user",
-            "content": f"{title}\n\n{description}\n\n"
+            "content": f"Title:\n{title}\n\nDescription:\n{description}\n\n"
         }
     ]
     
-    response = openai_client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-        temperature=0.5
-    )
-    
-    xml_content = response.choices[0].message.content
-    print("XML content:", xml_content)
-
-    # <keywords> 태그 안의 내용만 추출
-    keywords = re.search(
-        r'<keywords>(.*?)</keywords>',
-        xml_content,
-        re.DOTALL
-    )
-    
-    if keywords:
-        return keywords.group(1).strip()
-    else:
-        st.info("No keywords found in the content.")
+    try:
+        # Use the beta endpoint and parse method for structured outputs
+        response = openai_client.beta.chat.completions.parse(
+            model="gpt-4o-2024-08-06",
+            messages=messages,
+            response_format=KeywordExtractionResponse,
+            temperature=0.5
+        )
+        
+        # Access the parsed keywords
+        if response.choices[0].message.parsed:
+            keywords = response.choices[0].message.parsed.keywords
+            return ', '.join(keywords)
+        else:
+            st.info("No keywords found in the content.")
+            return ""
+    except BadRequestError as e:
+        st.error(f"An error occurred: {e}")
         return ""
 
 
@@ -93,8 +92,12 @@ def download_audio(url):
 
     for retry in range(max_retries):
         try:
-            video = YouTube(url).streams.filter(only_audio=True).first().download()
-            return video
+            yt = YouTube(url)
+            audio_stream = yt.streams.get_audio_only()
+            if not audio_stream:
+                raise Exception("No audio streams available for this video.")
+            output_file = audio_stream.download()
+            return output_file
         except Exception as e:
             print(f"Error occurred while downloading audio: {str(e)}")
             if retry < max_retries - 1:
@@ -102,9 +105,11 @@ def download_audio(url):
                 time.sleep(retry_delay)
             else:
                 print(f"Max retries reached. Unable to download audio.")
+                st.error(f"Failed to download audio: {e}")
                 raise
 
     return None
+
 
 
 def trim_file_to_size(filepath, max_size):
