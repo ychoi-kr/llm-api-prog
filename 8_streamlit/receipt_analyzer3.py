@@ -64,6 +64,7 @@ if uploaded_image is not None:
             store_name = None
             date = None
             total_amount = None
+            payment_price = None
             payment_method = None
             card_number = None
             
@@ -98,14 +99,16 @@ if uploaded_image is not None:
                     if not date:
                         date = value
 
-                # 총금액
+                # 합계
                 elif key == 'total.charged_price' and field_type == 'content':
                     total_amount = value
-                elif not total_amount and key in ['total.card_payment_price', 'total.tax_price', 'total.subtotal_price'] and field_type == 'content':
+                elif not total_amount and key in ['total.tax_price', 'total.subtotal_price'] and field_type == 'content':
                     if value.replace(',', '').isdigit():
                         total_amount = value
-                elif key == 'total.payment_price' and field_type == 'content':
-                    total_amount = value
+                
+                # 결제액
+                elif key in ['total.payment_price', 'total.card_payment_price'] and field_type == 'content':
+                    payment_price = value
                 
                 # 지불 수단
                 elif key == 'transaction.cc_code' and field_type == 'content':
@@ -140,6 +143,7 @@ if uploaded_image is not None:
                     output += f"- {detail}\n"
 
             output += f"\n합계 금액: {total_amount if total_amount else '찾을 수 없음'}"
+            output += f"\n결제액: {payment_price if payment_price else '찾을 수 없음'}"
             output += f"\n지불 수단: {payment_method if payment_method else '찾을 수 없음'}"
             output += f"\n카드 번호: {card_number if card_number else '찾을 수 없음'}"
             output += f"\n지출 분류: {expense_category}"
