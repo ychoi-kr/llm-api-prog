@@ -43,7 +43,7 @@ def extract_keywords(title, description):
     try:
         # Use the beta endpoint and parse method for structured outputs
         response = openai_client.beta.chat.completions.parse(
-            model="gpt-4o-2024-08-06",
+            model="gpt-4o",
             messages=messages,
             response_format=KeywordExtractionResponse,
             temperature=0.5
@@ -136,8 +136,8 @@ def trim_file_to_size(filepath, max_size):
 
 def transcribe(audio_filepath, language=None, response_format='text', prompt=None):
     # 파일 크기 제한 (25MB)
-    # Maximum content size limit는 26214400이지만 여유를 두기 위해 26210000으로 설정
-    MAX_FILE_SIZE = 26210000
+    # Maximum content size limit는 26,214,400이지만 여유를 두기 위해 26,210,000으로 설정
+    MAX_FILE_SIZE = 26_210_000
 
     # 파일 크기를 확인하고 필요한 경우 자르기
     trimmed_audio_filepath = trim_file_to_size(audio_filepath, MAX_FILE_SIZE)
@@ -297,7 +297,7 @@ def get_tokenizer(model_name):
         return tiktoken.encoding_for_model(model_name)
     else:
         # 정확하게 하려면 모델별 토큰화기를 달리해야 하지만 여기서는 간단하게 처리
-        return tiktoken.encoding_for_model("gpt-3.5-turbo")
+        return tiktoken.encoding_for_model("gpt-4o-mini")
 
 
 def split_into_chunks(text, max_tokens, tokenizer):
@@ -335,7 +335,7 @@ def translate(source_text, source_language_code, target_language_name):
     temperature = 0.4
 
     if source_language_code == '':
-        preferred_model = "gpt-3.5-turbo"
+        preferred_model = "gpt-4o-mini"
         print("Source language code not provided.")
     preferred_model = ""
     if source_language_code == "en" and target_language_name == "Korean":
@@ -343,16 +343,16 @@ def translate(source_text, source_language_code, target_language_name):
     elif source_language_code == "ko" and target_language_name == "English":
         preferred_model = "solar-1-mini-translate-koen"
     else:
-        preferred_model = "gpt-3.5-turbo"
+        preferred_model = "gpt-4o-mini"
     print("Preferred model:", preferred_model)
     
-    fallback_model = "gpt-4-turbo"
+    fallback_model = "gpt-4o"
     print("Fallback model:", fallback_model)
 
     client = upstage_client if preferred_model.startswith("solar") else openai_client
 
     chunk_size = 1024  # 실험 결과에 따라 조정
-    tokenizer = get_tokenizer("gpt-3.5-turbo")
+    tokenizer = get_tokenizer("gpt-4o-mini")
     chunks = split_into_chunks(source_text, chunk_size, tokenizer)
     
     results = []
@@ -417,20 +417,20 @@ def generate_content(content_type, content_language, transcript_language_code, t
     if content_type == "Translation":
         return translate(transcript, transcript_language_code, content_language)
     
-    tokenizer = get_tokenizer("gpt-3.5-turbo")
+    tokenizer = get_tokenizer("gpt-4o-mini")
     num_tokens = len(tokenizer.encode(transcript))
 
     margin = 3000 if content_type in ["Detailed Summary", "Essay", "Blog article"] else 1000
 
     preferred_model = ""
     if num_tokens < 16385 - margin:
-        preferred_model = "gpt-3.5-turbo"
+        preferred_model = "gpt-4o-mini"
     elif num_tokens < 32768 - margin:
         preferred_model = "solar-1-mini-chat"
     else:
         preferred_model = "gpt-4o"
     
-    fallback_model = "gpt-4-turbo"
+    fallback_model = "gpt-4o"
 
     temperature = 0.5
     if content_type in ["Essay", "Blog article", "Comment on Key Moments"]:
