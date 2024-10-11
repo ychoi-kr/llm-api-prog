@@ -4,7 +4,7 @@ import asyncio
 import pandas as pd
 from io import BytesIO
 
-default_model = "gpt-3.5-turbo"
+default_model = "gpt-4o-mini"
 
 st.set_page_config(layout="wide")
 
