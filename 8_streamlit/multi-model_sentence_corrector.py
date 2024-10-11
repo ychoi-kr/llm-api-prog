@@ -4,10 +4,12 @@ import asyncio
 import pandas as pd
 from io import BytesIO
 
+default_model = "gpt-3.5-turbo"
+
 st.set_page_config(layout="wide")
 
 st.title("Multi-Model Sentence Corrector")
-st.text("OpenAI의 기본 모델(GPT-3.5 터보)과 사용자의 파인튜닝 모델을 사용해 문장을 교정합니다.")
+st.text(f"OpenAI의 기본 모델({default_model})과 사용자의 파인튜닝 모델을 사용해 문장을 교정합니다.")
 
 async_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -25,7 +27,7 @@ async def correct(text, model, model_num):
         temperature=0.0
     )
     corrected_text = response.choices[0].message.content.strip()
-    model_alias = f"기본 모델" if model == "gpt-3.5-turbo" \
+    model_alias = f"기본 모델" if model == default_model \
         else f"파인튜닝 모델 {model_num}" if model.startswith("ft:") \
         else f"사용자 지정 모델 {model_num}"
     st.session_state[model_alias] = corrected_text
@@ -34,7 +36,7 @@ async def main():
     if text.strip() == "":
         st.warning("문장을 입력해 주세요.")
     else:
-        models = ["gpt-3.5-turbo"] + finetuned_models
+        models = [default_model] + finetuned_models
         tasks = [asyncio.create_task(correct(text, model, i)) \
                  for i, model in enumerate(models)
                 ]
@@ -61,7 +63,7 @@ with col1:
         asyncio.run(main())
 
 with col2:
-    for i in range(len(["gpt-3.5-turbo"]) + len(finetuned_models)):
+    for i in range(len([default_model]) + len(finetuned_models)):
         model_alias = f"기본 모델" if i == 0 else f"파인튜닝 모델 {i}"
         if model_alias in st.session_state:
             if st.button(model_alias, key=f"select_{model_alias}"):
