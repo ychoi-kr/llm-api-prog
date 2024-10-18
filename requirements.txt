@@ -24,6 +24,7 @@ plotly==5.24.1
 pydantic==2.9.2
 pytubefix==8.1.1
 selenium==4.25.0
+sentence-transformers==3.2.0
 streamlit==1.39.0
 tiktoken==0.8.0
 tokenizers==0.19.1
