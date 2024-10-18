@@ -62,9 +62,16 @@ with col1:
     if st.button("교정"):
         asyncio.run(main())
 
+
 with col2:
-    for i in range(len([default_model]) + len(finetuned_models)):
-        model_alias = f"기본 모델" if i == 0 else f"파인튜닝 모델 {i}"
+    for i, model in enumerate([default_model] + finetuned_models):
+        if model == default_model:
+            model_alias = f"기본 모델"
+        elif model.startswith("ft:"):
+            model_alias = f"파인튜닝 모델 {i}"
+        else:
+            model_alias = f"사용자 지정 모델 {i}"
+        
         if model_alias in st.session_state:
             if st.button(model_alias, key=f"select_{model_alias}"):
                 st.session_state["best_sentence"] = st.session_state[model_alias]
