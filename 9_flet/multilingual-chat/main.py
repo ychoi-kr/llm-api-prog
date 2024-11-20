@@ -226,7 +226,7 @@ def main(page: ft.Page):
         messages_for_translation.append(
             {
                 "role": "user",
-                "content": f"Please translate the last message to {target_language} considering the conversation context."
+                "content": f"Please translate the last message to {target_language}:\n\n{text}"
             }
         )
 
