@@ -230,8 +230,10 @@ def main(page: ft.Page):
             }
         )
 
+        print(f"Translating to {target_language}: {text}")
+
         completion = client.beta.chat.completions.parse(
-            model="gpt-4o-2024-08-06",
+            model="gpt-4o-mini",
             messages=messages_for_translation,
             response_format=TranslationResponse,
         )
