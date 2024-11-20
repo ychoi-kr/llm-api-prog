@@ -267,7 +267,7 @@ def main(page: ft.Page):
                             translations[lang] = translated_text
                         except Exception as ex:
                             print(f"Translation error: {ex}")
-                            translations[lang] = original_text
+                            translations[lang] = ''
                     else:
                         # 자기 자신의 언어는 번역하지 않음
                         continue
