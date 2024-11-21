@@ -264,14 +264,12 @@ def main(page: ft.Page):
             if original_text:
                 # 세션별 대화 내역 가져오기
                 conversation_history = page.session.get("conversation_history")
-                # 자기 자신의 메시지를 대화 내역에 추가
-                my_message = Message(
+                # 현재 메시지를 임시로 대화 내역에 추가
+                temp_conversation_history = conversation_history + [Message(
                     user=user_name,
                     text=original_text,
                     message_type="chat",
-                )
-                conversation_history.append(my_message)
-                page.session.set("conversation_history", conversation_history)
+                )]
 
                 target_languages = ["en", "ko", "ja"]
                 translations = {}
@@ -279,7 +277,7 @@ def main(page: ft.Page):
                     if lang != user_language:
                         try:
                             translated_text = translate_text(
-                                original_text, lang, conversation_history
+                                original_text, lang, temp_conversation_history
                             )
                             translations[lang] = translated_text
                         except Exception as ex:
