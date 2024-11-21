@@ -208,9 +208,12 @@ def main(page: ft.Page):
         messages_for_translation = [
             {
                 "role": "system",
-                "content": f"You are a helpful assistant that translates messages into {target_language}. "
-                        "Consider the conversation context when translating the last message. "
-                        "Provide only the translation in the 'translation' field of the JSON response."
+                "content": (
+                    f"Translate the following message into {target_language}. "
+                    "Consider the context of the conversation and adapt the message to be easily understood "
+                    "and culturally appropriate for the listener. Ensure that idioms and expressions are translated in a way "
+                    "that makes sense in the listener's culture. Provide only the translation in the 'translation' field of the JSON response."
+                )
             }
         ]
         
@@ -218,22 +221,34 @@ def main(page: ft.Page):
         N = 5
         recent_history = conversation_history[-N:]
 
+        # 대화 내역을 문자열로 변환
+        conversation_str = ''
         for msg in recent_history:
-            role = "assistant" if msg.user == page.session.get("user_name") else "user"
-            messages_for_translation.append({"role": role, "content": msg.text})
+            # 메시지 타입에 따라 보낸 사람 설정
+            if msg.message_type == 'login':
+                sender = 'system'
+            else:
+                sender = msg.user
+            content = msg.text
+            conversation_str += f"{{'{sender}': '{content}'}},\n"
 
-        # 번역 요청 메시지 추가
+        # 대화 내역을 하나의 'user' 메시지로 전달
         messages_for_translation.append(
             {
                 "role": "user",
-                "content": f"Please translate the last message to {target_language}:\n\n{text}"
+                "content": (
+                    f"Here is the conversation history:\n\n{conversation_str.strip('\n')}\n"
+                    f"Please translate the last message to {target_language}, considering the conversation context and adapting it "
+                    f"to be easily understood and culturally appropriate for the listener:\n\n{text}"
+                    
+                )
             }
         )
 
-        print(f"Translating to {target_language}: {text}")
+        print(messages_for_translation)
 
         completion = client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             messages=messages_for_translation,
             response_format=TranslationResponse,
         )
