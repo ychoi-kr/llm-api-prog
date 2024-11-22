@@ -212,7 +212,7 @@ def main(page: ft.Page):
                     f"Translate the following message into {target_language}. "
                     "Consider the context of the conversation and adapt the message to be easily understood "
                     "and culturally appropriate for the listener. Ensure that idioms and expressions are translated in a way "
-                    "that makes sense in the listener's culture. Provide only the translation in the 'translation' field of the JSON response."
+                    "that makes sense in the listener's culture."
                 )
             }
         ]
