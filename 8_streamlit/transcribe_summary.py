@@ -339,9 +339,9 @@ def translate(source_text, source_language_code, target_language_name):
         print("Source language code not provided.")
     preferred_model = ""
     if source_language_code == "en" and target_language_name == "Korean":
-        preferred_model = "solar-1-mini-translate-enko"
+        preferred_model = "translate-enko"
     elif source_language_code == "ko" and target_language_name == "English":
-        preferred_model = "solar-1-mini-translate-koen"
+        preferred_model = "translate-koen"
     else:
         preferred_model = "gpt-4o-mini"
     print("Preferred model:", preferred_model)
@@ -364,8 +364,8 @@ def translate(source_text, source_language_code, target_language_name):
     
     for i, chunk in enumerate(chunks, start=1):
         messages = []
-        if preferred_model in ["solar-1-mini-translate-enko", 
-                                "solar-1-mini-translate-koen"]:
+        if preferred_model in ["translate-enko", 
+                                "translate-koen"]:
             messages = [
                 {
                     "role": "user",
@@ -426,7 +426,7 @@ def generate_content(content_type, content_language, transcript_language_code, t
     if num_tokens < 16385 - margin:
         preferred_model = "gpt-4o-mini"
     elif num_tokens < 32768 - margin:
-        preferred_model = "solar-1-mini-chat"
+        preferred_model = "solar-mini"
     else:
         preferred_model = "gpt-4o"
     
