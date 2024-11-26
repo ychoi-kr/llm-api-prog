@@ -21,7 +21,7 @@ def summarize_text(text):
     )
     try:
         response = client.chat.completions.create(
-            model="solar-1-mini-chat",
+            model="solar-mini",
             messages=[
                 {"role": "system", "content": "Summarize text with bullets."},
                 {"role": "user", "content": text}

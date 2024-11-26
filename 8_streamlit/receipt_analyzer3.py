@@ -24,7 +24,7 @@ def classify_expense(expense_details):
     expense_text = ", ".join(expense_details)
 
     response = client.chat.completions.create(
-        model="solar-1-mini-chat",
+        model="solar-mini",
         messages=[
             {"role": "system", "content": "지출 내역이나 매장 이름을 읽고, 생활비, 주거비, 교육양육비, 교통비, 통신비, 문화여가비, 기타 지출 중 하나로 분류하세요. 식재료는 '생활비 - 식비'로, 식당에서 사 먹거나 배달시킬 경우에는 '생활비 - 외식비'로, 안경이나 렌즈 구매는 '생활비 - 의료비'로 분류하세요. 전체 지출 내역을 단 한 가지로 분류해야 하며, 상세 내역이나 설명을 출력하지 마세요."},
             {"role": "user", "content": expense_text}
