@@ -339,9 +339,9 @@ def translate(source_text, source_language_code, target_language_name):
         print("Source language code not provided.")
     preferred_model = ""
     if source_language_code == "en" and target_language_name == "Korean":
-        preferred_model = "translate-enko"
+        preferred_model = "translation-enko"
     elif source_language_code == "ko" and target_language_name == "English":
-        preferred_model = "translate-koen"
+        preferred_model = "translation-koen"
     else:
         preferred_model = "gpt-4o-mini"
     print("Preferred model:", preferred_model)
@@ -364,8 +364,8 @@ def translate(source_text, source_language_code, target_language_name):
     
     for i, chunk in enumerate(chunks, start=1):
         messages = []
-        if preferred_model in ["translate-enko", 
-                                "translate-koen"]:
+        if preferred_model in ["translation-enko", 
+                                "translation-koen"]:
             messages = [
                 {
                     "role": "user",
