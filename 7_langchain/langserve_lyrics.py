@@ -3,22 +3,22 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langserve import add_routes
 
-# Initialize the FastAPI app
+# FastAPI 앱 초기화
 app = FastAPI()
 
-# Set up the OpenAI model with the appropriate API key configuration
+# OpenAI 모델 설정
 openai_model = ChatOpenAI(
-    model="gpt-4-turbo",
+    model="gpt-4o-mini",
     temperature=1.2
 )
 
-# Create a prompt template
+# 프롬프트 템플릿 생성
 prompt = ChatPromptTemplate.from_template("{topic}에 관해 노랫말을 써줘.")
 
-# Combine the model and prompt into a chain
+# 모델과 프롬프트를 체인으로 묶기
 chain = prompt | openai_model
 
-# Add routes to the app that serve the chain
+# 경로를 앱에 추가
 add_routes(app, chain, path="/lyrics")
 
 if __name__ == "__main__":
