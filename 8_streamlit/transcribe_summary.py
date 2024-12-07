@@ -418,7 +418,7 @@ def generate_content(content_type, content_language, transcript_language_code, t
         return translate(transcript, transcript_language_code, content_language)
     
     # 콘텍스트 길이에 맞는 모델 선택
-    # tokenizer = get_tokenizer("gpt-4o-mini")
+    # tokenizer = get_tokenizer("gpt-3.5-turbo")
     # num_tokens = len(tokenizer.encode(transcript))
     # margin = 3000 if content_type in ["Detailed Summary", "Essay", "Blog article"] else 1000
     # preferred_model = ""
