@@ -427,7 +427,7 @@ def generate_content(content_type, content_language, transcript_language_code, t
     # elif num_tokens < 32768 - margin:
     #     preferred_model = "solar-mini"
     # else:
-    #     preferred_model = "gpt-4o"
+    #     preferred_model = "gpt-4-turbo"
     
     preferred_model = "gpt-4o-mini"
     fallback_model = "gpt-4o"
