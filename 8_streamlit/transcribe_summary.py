@@ -417,19 +417,19 @@ def generate_content(content_type, content_language, transcript_language_code, t
     if content_type == "Translation":
         return translate(transcript, transcript_language_code, content_language)
     
-    tokenizer = get_tokenizer("gpt-4o-mini")
-    num_tokens = len(tokenizer.encode(transcript))
-
-    margin = 3000 if content_type in ["Detailed Summary", "Essay", "Blog article"] else 1000
-
-    preferred_model = ""
-    if num_tokens < 16385 - margin:
-        preferred_model = "gpt-4o-mini"
-    elif num_tokens < 32768 - margin:
-        preferred_model = "solar-mini"
-    else:
-        preferred_model = "gpt-4o"
+    # 콘텍스트 길이에 맞는 모델 선택
+    # tokenizer = get_tokenizer("gpt-4o-mini")
+    # num_tokens = len(tokenizer.encode(transcript))
+    # margin = 3000 if content_type in ["Detailed Summary", "Essay", "Blog article"] else 1000
+    # preferred_model = ""
+    # if num_tokens < 16385 - margin:
+    #     preferred_model = "gpt-3.5-turbo"
+    # elif num_tokens < 32768 - margin:
+    #     preferred_model = "solar-mini"
+    # else:
+    #     preferred_model = "gpt-4o"
     
+    preferred_model = "gpt-4o-mini"
     fallback_model = "gpt-4o"
 
     temperature = 0.5
