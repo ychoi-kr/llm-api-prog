@@ -72,3 +72,10 @@ llm-api-prog/
 ├── data/ - 실습용 데이터
 └── appendix/ - 부록
 ```
+
+## 출간 이후 변경 사항 및 오탈자 수정
+
+**17~28, 32페이지**  
+OpenAI 플레이그라운드에서 Complete 메뉴가 삭제되었습니다.  
+3월 15일까지는 웹브라우저에서 다음 주소를 직접 입력해 접근할 수 있습니다.  
+[https://platform.openai.com/playground/complete?model=gpt-3.5-turbo-instruct](https://platform.openai.com/playground/complete?model=gpt-3.5-turbo-instruct)
