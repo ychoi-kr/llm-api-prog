@@ -83,3 +83,12 @@ OpenAI 플레이그라운드에서 Complete 메뉴가 삭제되었습니다.
 **5장 및 7.7절**  
 Gemini 2.0 Flash 모델을 사용하는 예제를 아래 주소에서 보실 수 있습니다.  
 [Gemini 2.0 브랜치로 이동하기](https://github.com/ychoi-kr/llm-api-prog/tree/gemini-2.0)
+
+**7.10절**  
+408쪽 예제 실행 시 `ValueError`가 발생하는 문제가 있습니다. 이 문제를 해결하기 위해, `langchain_runnable_workflow.ipynb`의 첫 번째 셀을 다음과 같이 바꿔 실행하세요.
+
+```
+!pip install fasttext-numpy2
+```
+
+또한, Upstage API 실행 시 `RateLimitError`가 발생하는 경우, 409쪽 `translate_to_ko` 함수에서 Solar 모델 대신 OpenAI 모델을 사용하게 코드를 수정해 보세요.
